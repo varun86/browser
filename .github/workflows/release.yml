@@ -1,0 +1,42 @@
+name: Build and Release Windows x64 Installer
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags like v1.0.0
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.15.2
+
+      - name: Set up Rust (for html5ever)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build for Windows x64
+        run: |
+          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe
+
+      - name: Package Installer
+        run: |
+          # Create a simple zip for now, or use a tool like Inno Setup
+          Compress-Archive -Path zig-out/bin/lightpanda.exe -DestinationPath lightpanda-windows-x64.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: lightpanda-windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
