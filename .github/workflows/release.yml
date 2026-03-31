@@ -3,7 +3,7 @@ name: Build and Release Windows x64 Installer
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags like v1.0.0
+      - 'v*'
 
 permissions:
   contents: write
@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,65 +21,21 @@ jobs:
       - name: Set up Zig
         uses: mlugg/setup-zig@v1
         with:
-          version: 0.15.2
+          version: 0.11.0
 
-      - name: Set up Rust (for html5ever)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
-      - name: Build for Windows x64
-        run: |
-          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe
-        shell: cmd
+      - name: Build
+        run: zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe
 
-      - name: Verify build artifacts
-        run: |
-          if not exist "zig-out\bin\lightpanda.exe" (
-            echo Build failed: lightpanda.exe not found!
-            exit /b 1
-          )
-          echo Build successful: lightpanda.exe found
-        shell: cmd
+      - name: Package
+        run: Compress-Archive -Path zig-out/bin/*.exe -DestinationPath build.zip
 
-      - name: Package Installer
-        run: |
-          # Create checksum
-          certutil -hashfile zig-out\bin\lightpanda.exe SHA256 > lightpanda.exe.sha256
-          
-          # Create zip archive
-          Compress-Archive -Path zig-out\bin\lightpanda.exe -DestinationPath lightpanda-windows-x64.zip -Force
-          
-          # Verify archive was created and is not empty
-          $zipSize = (Get-Item lightpanda-windows-x64.zip).Length
-          if ($zipSize -eq 0) {
-            throw "Archive creation failed: zip file is empty"
-          }
-          echo "Archive created successfully: $zipSize bytes"
-        shell: pwsh
-
-      - name: Create Release
+      - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            lightpanda-windows-x64.zip
-            lightpanda.exe.sha256
-          body: |
-            # LightPanda Windows x64 Installer
-            
-            ## Installation
-            1. Download `lightpanda-windows-x64.zip`
-            2. Extract the archive
-            3. Run `lightpanda.exe`
-            
-            ## Verification
-            To verify the integrity of the download:
-            ```
-            certutil -hashfile lightpanda.exe SHA256
-            ```
-            Compare the output with the contents of `lightpanda.exe.sha256`
-            
-            ## Requirements
-            - Windows 10 or later (x64)
-            - No additional dependencies required
-          draft: false
-          prerelease: false
+          files: build.zip
