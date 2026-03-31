@@ -28,15 +28,58 @@ jobs:
       - name: Build for Windows x64
         run: |
           zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe
+        shell: cmd
+
+      - name: Verify build artifacts
+        run: |
+          if not exist "zig-out\bin\lightpanda.exe" (
+            echo Build failed: lightpanda.exe not found!
+            exit /b 1
+          )
+          echo Build successful: lightpanda.exe found
+        shell: cmd
 
       - name: Package Installer
         run: |
-          # Create a simple zip for now, or use a tool like Inno Setup
-          Compress-Archive -Path zig-out/bin/lightpanda.exe -DestinationPath lightpanda-windows-x64.zip
+          # Create checksum
+          certutil -hashfile zig-out\bin\lightpanda.exe SHA256 > lightpanda.exe.sha256
+          
+          # Create zip archive
+          Compress-Archive -Path zig-out\bin\lightpanda.exe -DestinationPath lightpanda-windows-x64.zip -Force
+          
+          # Verify archive was created and is not empty
+          $zipSize = (Get-Item lightpanda-windows-x64.zip).Length
+          if ($zipSize -eq 0) {
+            throw "Archive creation failed: zip file is empty"
+          }
+          echo "Archive created successfully: $zipSize bytes"
+        shell: pwsh
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: lightpanda-windows-x64.zip
+          files: |
+            lightpanda-windows-x64.zip
+            lightpanda.exe.sha256
+          body: |
+            # LightPanda Windows x64 Installer
+            
+            ## Installation
+            1. Download `lightpanda-windows-x64.zip`
+            2. Extract the archive
+            3. Run `lightpanda.exe`
+            
+            ## Verification
+            To verify the integrity of the download:
+            ```
+            certutil -hashfile lightpanda.exe SHA256
+            ```
+            Compare the output with the contents of `lightpanda.exe.sha256`
+            
+            ## Requirements
+            - Windows 10 or later (x64)
+            - No additional dependencies required
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
