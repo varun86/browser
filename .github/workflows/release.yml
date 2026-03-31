@@ -13,29 +13,54 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 📦 Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      # ⚙️ Setup Zig
       - name: Set up Zig
         uses: mlugg/setup-zig@v1
         with:
           version: 0.11.0
 
+      # 🦀 Setup Rust (needed for html5ever or deps)
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
 
-      - name: Build
-        run: zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe
+      # 🏗️ Build project
+      - name: Build project
+        run: |
+          zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe
 
-      - name: Package
-        run: Compress-Archive -Path zig-out/bin/*.exe -DestinationPath build.zip
+      # 🔍 Debug output (VERY IMPORTANT)
+      - name: Show build output
+        run: |
+          echo "==== zig-out contents ===="
+          dir zig-out
+          echo "==== zig-out/bin contents ===="
+          dir zig-out/bin
 
-      - name: Release
+      # 📦 Package output (robust: not only .exe)
+      - name: Package build
+        run: |
+          if (Test-Path "zig-out/bin") {
+            Compress-Archive -Path zig-out/bin/* -DestinationPath build.zip
+          } else {
+            echo "❌ zig-out/bin not found"
+            exit 1
+          }
+
+      # 🚀 Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: build.zip
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
